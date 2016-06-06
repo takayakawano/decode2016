@@ -1,28 +1,6 @@
-﻿// =====================================================================
-//  This file is part of the Microsoft Dynamics CRM SDK code samples.
-//
-//  Copyright (C) Microsoft Corporation.  All rights reserved.
-//
-//  This source code is intended only as a supplement to Microsoft
-//  Development Tools and/or on-line documentation.  See these other
-//  materials for detailed information regarding Microsoft code samples.
-//
-//  THIS CODE AND INFORMATION ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY
-//  KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
-//  IMPLIED WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A
-//  PARTICULAR PURPOSE.
-// =====================================================================
-
-//<snippetCustomActivity>
-using System;
+﻿using System;
 using System.Activities;
-
-// These namespaces are found in the Microsoft.Xrm.Sdk.dll assembly
-// located in the SDK\bin folder of the SDK download.
 using Microsoft.Xrm.Sdk;
-
-// These namespaces are found in the Microsoft.Xrm.Sdk.Workflow.dll assembly
-// located in the SDK\bin folder of the SDK download.
 using Microsoft.Xrm.Sdk.Workflow;
 
 using System.Collections.Generic;
@@ -35,16 +13,10 @@ using System.Runtime.Serialization.Json;
 
 namespace Microsoft.Crm.Sdk.Samples
 {
-    /// <summary>
-    /// Creates a task with a subject equal to the ID of the input entity.
-    /// Input arguments:
-    ///   "Input Entity". Type: EntityReference. Is the account entity.
-    /// Output argument:
-    ///   "Task Created". Type: EntityReference. Is the task created.
-    /// </summary>
+
     public sealed partial class CustomActivityForOpp : CodeActivity
     {
-
+        // Azure ML Web API と JSON でやりとりするクラス
         public class Rootobject
         {
             public Results Results { get; set; }
@@ -70,14 +42,10 @@ namespace Microsoft.Crm.Sdk.Samples
 
 
         /// <summary>
-        /// Creates a task with a subject equal to the ID of the input EntityReference
+        /// 営業案件の確度をAzureMLで予測し、結果をCRMに出力する
         /// </summary>
         protected override void Execute(CodeActivityContext executionContext)
         {
-            ITracingService tracingService = executionContext.GetExtension<ITracingService>();
-
-
-            // Input
             string webapikey = this.InputApikey.Get(executionContext);
             string uri = this.InputUri.Get(executionContext);
             string OwnershipCode = this.InputOwnershipCode.Get(executionContext);
@@ -91,10 +59,10 @@ namespace Microsoft.Crm.Sdk.Samples
                 dBud = BudgetAmount.Value;
             bool decisionmaker = this.InputDecisionmaker.Get(executionContext);
 
-            // Do ML Prediction
+            // 営業案件の確度予測を実行
             Value mlresults = InvokeRequestResponseService(webapikey, uri, OwnershipCode, dRev, dBud, decisionmaker);
 
-            // Set output paramaters
+            // 予測結果を出力情報に設定
             string MLResult = ((string[])(mlresults.Values.GetValue(0)))[0];
             int MLprobability = 0;
             switch (MLResult)
@@ -111,34 +79,40 @@ namespace Microsoft.Crm.Sdk.Samples
             this.OutMLprobability.Set(executionContext, MLprobability);
         }
 
-        // Define Input/Output Arguments
+        // 入力情報: AzureML WebAPI Key
         [RequiredArgument]
         [Input("InputApikey")]
         public InArgument<string> InputApikey { get; set; }
 
+        // 入力情報: AzureML WebURI
         [RequiredArgument]
         [Input("InputUri")]
         public InArgument<string> InputUri { get; set; }
 
+        // 入力情報: 企業形態
         [RequiredArgument]
         [Input("InputOwnershipCode")]
         public InArgument<string> InputOwnershipCode { get; set; }
 
+        // 入力情報: 売上高
         [RequiredArgument]
         [Input("InputRevenue")]
         [Default("0")]
         public InArgument<Money> InputRevenue { get; set; }
 
+        // 入力情報: 予算金額
         [RequiredArgument]
         [Input("InputBudgetAmount")]
         [Default("0")]
         public InArgument<Money> InputBudgetAmount { get; set; }
 
+        // 入力情報: 決済者の有無
         [RequiredArgument]
         [Input("InputDecisionmaker")]
         [Default("True")]
         public InArgument<bool> InputDecisionmaker { get; set; }
 
+        // 出力情報: 予測確度
         [Output("OutMLprobability")]
         public OutArgument<int> OutMLprobability { get; set; }
 
@@ -147,8 +121,7 @@ namespace Microsoft.Crm.Sdk.Samples
             Value results = new Value();
             using (var client = new HttpClient())
             {
-
-                string apiKey = webapikey; // Replace this with the API key for the web service
+                string apiKey = webapikey;
                 client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
                 client.BaseAddress = new Uri(uri);
@@ -156,13 +129,13 @@ namespace Microsoft.Crm.Sdk.Samples
                 StringBuilder stb = new StringBuilder();
                 stb.Append("{'Inputs':{'input1':{'ColumnNames':['企業形態 (取引先企業) (取引先企業 )','売上高 (取引先企業) (取引先企業 )','予算金額','決定者の有無'],'Values':[[");
                 stb.Append(string.Format("'{0}',", ownershipcode));
-                stb.Append(string.Format("'{0}',", decimal.ToInt32(revenue).ToString()));//"100000000"));
-                stb.Append(string.Format("'{0}',", decimal.ToInt32(budgetamount).ToString()));// "1000000")); //budgetamount.Value.ToString()));
+                stb.Append(string.Format("'{0}',", decimal.ToInt32(revenue).ToString()));
+                stb.Append(string.Format("'{0}',", decimal.ToInt32(budgetamount).ToString()));
                 stb.Append(string.Format("'{0}',", decisionmaker ? "有" : "無"));
                 stb.Append("],[");
                 stb.Append(string.Format("'{0}',", ownershipcode));
-                stb.Append(string.Format("'{0}',", decimal.ToInt32(revenue).ToString()));//"100000000"));
-                stb.Append(string.Format("'{0}',", decimal.ToInt32(budgetamount).ToString())); //budgetamount.Value.ToString()));
+                stb.Append(string.Format("'{0}',", decimal.ToInt32(revenue).ToString()));
+                stb.Append(string.Format("'{0}',", decimal.ToInt32(budgetamount).ToString()));
                 stb.Append(string.Format("'{0}',", decisionmaker ? "有" : "無"));
                 stb.Append("]]}},'GlobalParameters':{}}");
 
@@ -183,4 +156,3 @@ namespace Microsoft.Crm.Sdk.Samples
         }
     }
 }
-//</snippetCustomActivity>
